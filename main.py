@@ -1,6 +1,6 @@
 import sys
 import math
-import json # Sửa lỗi "json is not defined"
+import json
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -12,7 +12,7 @@ class GraphApp(QMainWindow):
         self.setWindowTitle("ĐỒ ÁN ĐỒ THỊ FINAL - NGUYỄN THIÊN PHÚ - UTH")
         self.setGeometry(30, 30, 1280, 850)
         
-        # Khởi tạo Engine
+
         self.engine = GraphEngine(is_directed=True)
         self.nodes_pos = {}
         self.selected_node = None
@@ -27,7 +27,6 @@ class GraphApp(QMainWindow):
         self.setCentralWidget(widget)
         layout = QHBoxLayout(widget)
 
-        # Thanh Menu chứa tất cả yêu cầu từ image_c2fcfe.png
         panel = QVBoxLayout()
         self.lbl_info = QLabel("CHẾ ĐỘ: THÊM ĐỈNH")
         self.lbl_info.setStyleSheet("font-weight: bold; color: #e67e22; font-size: 14px;")
@@ -56,7 +55,6 @@ class GraphApp(QMainWindow):
         
         panel.addStretch()
 
-        # Canvas vẽ đồ thị
         self.canvas = QLabel()
         self.canvas.setStyleSheet("background: white; border: 3px solid #2c3e50; border-radius: 10px;")
         self.canvas.setMinimumWidth(900)
@@ -97,7 +95,6 @@ class GraphApp(QMainWindow):
         painter = QPainter(pix)
         painter.setRenderHint(QPainter.Antialiasing)
         
-        # Vẽ cạnh kèm mũi tên
         for u, v in self.engine.graph.edges():
             p1, p2 = self.nodes_pos[u], self.nodes_pos[v]
             if high and ((u, v) in self.highlighted_edges or (v, u) in self.highlighted_edges):
@@ -106,7 +103,6 @@ class GraphApp(QMainWindow):
                 painter.setPen(QPen(Qt.black, 2))
             painter.drawLine(p1[0], p1[1], p2[0], p2[1])
 
-        # Vẽ đỉnh
         for nid, (nx, ny) in self.nodes_pos.items():
             color = Qt.green if nid == self.selected_node else QColor("#3498db")
             painter.setBrush(QBrush(color))
