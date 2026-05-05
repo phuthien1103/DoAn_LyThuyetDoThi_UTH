@@ -9,7 +9,7 @@ from graph_engine import GraphEngine
 class GraphApp(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("ĐỒ ÁN ĐỒ THỊ FINAL - NGUYỄN THIÊN PHÚ - UTH")
+        self.setWindowTitle("ĐỒ ÁN ĐỒ THỊ FINAL - NHÓM 0 - UTH")
         self.setGeometry(30, 30, 1280, 850)
         
 
