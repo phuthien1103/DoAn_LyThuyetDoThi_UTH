@@ -33,7 +33,7 @@ class GraphApp(QMainWindow):
 
         options = [
             ("❶ Thêm Đỉnh (Mục 1)", lambda: self.set_mode("NODE")),
-            ("❷ Nối Cạnh (Có hướng)", lambda: self.set_mode("EDGE")),
+            ("❷ Nối Cạnh (Nhập trọng số)", lambda: self.set_mode("EDGE")),
             ("❸ Duyệt BFS (Mục 4)", lambda: self.run_sim("bfs")),
             ("❹ Duyệt DFS (Mục 4)", lambda: self.run_sim("dfs")),
             ("❺ Kiểm tra 2 phía (Mục 5)", self.check_bi),
@@ -44,7 +44,7 @@ class GraphApp(QMainWindow):
             ("❿ Thuật toán Fleury (7.4)", lambda: self.run_sim("euler")),
             ("⓫ Hierholzer (7.5)", lambda: self.run_sim("euler")),
             ("⓬ Lưu đồ thị (Mục 2)", self.save_data),
-            ("⓭ Đường đi ngắn nhất (Dijkstra)", lambda: self.run_sim("shortest")) # Nút mới
+            ("⓭ Đường đi ngắn nhất (Dijkstra)", lambda: self.run_sim("shortest"))
         ]
 
         for text, func in options:
@@ -78,9 +78,12 @@ class GraphApp(QMainWindow):
             self.nodes_pos[nid] = (x, y)
             self.engine.graph.add_node(nid)
         elif self.mode == "EDGE" and target is not None:
-            if self.selected_node is None: self.selected_node = target
+            if self.selected_node is None: 
+                self.selected_node = target
             else:
-                self.engine.add_edge(self.selected_node, target)
+                weight, ok = QInputDialog.getInt(self, "Trọng số", f"Nhập trọng số cho cạnh {self.selected_node} -> {target}:", 10, 1, 1000)
+                if ok:
+                    self.engine.add_edge(self.selected_node, target, weight=weight)
                 self.selected_node = None
         self.update_drawing()
 
@@ -95,20 +98,33 @@ class GraphApp(QMainWindow):
         painter = QPainter(pix)
         painter.setRenderHint(QPainter.Antialiasing)
         
+
         for u, v in self.engine.graph.edges():
             p1, p2 = self.nodes_pos[u], self.nodes_pos[v]
+            
             if high and ((u, v) in self.highlighted_edges or (v, u) in self.highlighted_edges):
                 painter.setPen(QPen(Qt.red, 4))
             else:
                 painter.setPen(QPen(Qt.black, 2))
+            
             painter.drawLine(p1[0], p1[1], p2[0], p2[1])
+
+            mid_x = (p1[0] + p2[0]) / 2
+            mid_y = (p1[1] + p2[1]) / 2
+            weight = self.engine.graph[u][v].get('weight', 10)
+            painter.setPen(QPen(QColor("#27ae60"), 2))
+            painter.setFont(QFont("Arial", 10, QFont.Bold))
+            painter.drawText(int(mid_x), int(mid_y) - 5, str(weight))
 
         for nid, (nx, ny) in self.nodes_pos.items():
             color = Qt.green if nid == self.selected_node else QColor("#3498db")
             painter.setBrush(QBrush(color))
+            painter.setPen(QPen(Qt.black, 1))
             painter.drawEllipse(nx-18, ny-18, 36, 36)
             painter.setPen(Qt.white)
+            painter.setFont(QFont("Arial", 11, QFont.Bold))
             painter.drawText(nx-6, ny+5, str(nid))
+            
         painter.end()
         self.canvas.setPixmap(pix)
 
@@ -121,10 +137,14 @@ class GraphApp(QMainWindow):
         elif algo == "prim": edges = self.engine.get_prim_edges()
         elif algo == "kruskal": edges = self.engine.get_kruskal_edges()
         elif algo == "euler": edges = self.engine.get_euler_circuit()
-        elif algo == "shortest": # Logic mới
+        elif algo == "shortest":
             if len(self.nodes_pos) < 2: return
             edges = self.engine.get_shortest_path(0, len(self.nodes_pos)-1)
         else: return
+
+        if not edges: 
+            QMessageBox.warning(self, "Lỗi", "Không tìm thấy kết quả phù hợp!")
+            return
 
         self.step = 0
         try: self.timer.timeout.disconnect()
@@ -155,7 +175,7 @@ class GraphApp(QMainWindow):
 
     def save_data(self):
         with open("dothi_phu_final.json", "w") as f:
-            json.dump({"nodes": self.nodes_pos, "edges": list(self.engine.graph.edges())}, f)
+            json.dump({"nodes": self.nodes_pos, "edges": list(self.engine.graph.edges(data=True))}, f)
         QMessageBox.information(self, "Mục 2", "Đã lưu đồ thị thành công!")
 
 if __name__ == "__main__":
