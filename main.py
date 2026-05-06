@@ -1,60 +1,165 @@
-import networkx as nx
-import numpy as np
+import sys
+import math
 import json
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from graph_engine import GraphEngine
 
-class GraphEngine:
-    def __init__(self, is_directed=True):
-        self.graph = nx.DiGraph() if is_directed else nx.Graph()
+class GraphApp(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("ĐỒ ÁN ĐỒ THỊ FINAL - NHÓM 0 - UTH")
+        self.setGeometry(30, 30, 1280, 850)
 
-    def add_edge(self, u, v, weight=10):
-        self.graph.add_edge(u, v, weight=weight)
+        self.engine = GraphEngine(is_directed=True)
+        self.nodes_pos = {}
+        self.selected_node = None
+        self.mode = "NODE"
+        self.highlighted_edges = []
+        self.timer = QTimer()
+        
+        self.initUI()
 
-    def get_conversions(self):
-        matrix = nx.to_numpy_array(self.graph)
-        adj_list = dict(self.graph.adjacency())
-        edge_list = list(self.graph.edges(data=True))
-        return matrix, adj_list, edge_list
+    def initUI(self):
+        widget = QWidget()
+        self.setCentralWidget(widget)
+        layout = QHBoxLayout(widget)
 
-    def get_bfs_edges(self, start=0):
-        try: return list(nx.bfs_edges(self.graph, start))
-        except: return []
+        panel = QVBoxLayout()
+        self.lbl_info = QLabel("CHẾ ĐỘ: THÊM ĐỈNH")
+        self.lbl_info.setStyleSheet("font-weight: bold; color: #e67e22; font-size: 14px;")
+        panel.addWidget(self.lbl_info)
 
-    def get_dfs_edges(self, start=0):
-        try: return list(nx.dfs_edges(self.graph, start))
-        except: return []
+        options = [
+            ("❶ Thêm Đỉnh (Mục 1)", lambda: self.set_mode("NODE")),
+            ("❷ Nối Cạnh (Có hướng)", lambda: self.set_mode("EDGE")),
+            ("❸ Duyệt BFS (Mục 4)", lambda: self.run_sim("bfs")),
+            ("❹ Duyệt DFS (Mục 4)", lambda: self.run_sim("dfs")),
+            ("❺ Kiểm tra 2 phía (Mục 5)", self.check_bi),
+            ("❻ Biểu diễn đồ thị (Mục 6)", self.show_conv),
+            ("❼ Thuật toán Prim (7.1)", lambda: self.run_sim("prim")),
+            ("❽ Thuật toán Kruskal (7.2)", lambda: self.run_sim("kruskal")),
+            ("❾ Ford-Fulkerson (7.3)", self.run_ff),
+            ("❿ Thuật toán Fleury (7.4)", lambda: self.run_sim("euler")),
+            ("⓫ Hierholzer (7.5)", lambda: self.run_sim("euler")),
+            ("⓬ Lưu đồ thị (Mục 2)", self.save_data),
+            ("⓭ Đường đi ngắn nhất (Dijkstra)", lambda: self.run_sim("shortest")) # Nút mới
+        ]
 
-    def is_bipartite(self):
-        try: return nx.is_bipartite(self.graph)
-        except: return False
+        for text, func in options:
+            btn = QPushButton(text)
+            btn.setFixedHeight(35)
+            btn.clicked.connect(func)
+            panel.addWidget(btn)
+        
+        panel.addStretch()
 
-    def get_prim_edges(self):
-        try:
-            undirected = self.graph.to_undirected()
-            return list(nx.minimum_spanning_edges(undirected, algorithm='prim', data=True))
-        except: return []
+        self.canvas = QLabel()
+        self.canvas.setStyleSheet("background: white; border: 3px solid #2c3e50; border-radius: 10px;")
+        self.canvas.setMinimumWidth(900)
+        
+        layout.addLayout(panel, 1)
+        layout.addWidget(self.canvas, 4)
 
-    def get_kruskal_edges(self):
-        try:
-            undirected = self.graph.to_undirected()
-            return list(nx.minimum_spanning_edges(undirected, algorithm='kruskal', data=True))
-        except: return []
+    def set_mode(self, m):
+        self.mode = m
+        self.selected_node = None
+        self.lbl_info.setText(f"CHẾ ĐỘ: {m}")
 
-    def get_max_flow_ff(self, s, t):
-        try:
-            flow_value = nx.maximum_flow_value(self.graph, s, t, capacity='weight')
-            return flow_value
-        except: return 0
+    def mousePressEvent(self, event):
+        p = self.canvas.mapFromParent(event.pos())
+        x, y = p.x(), p.y()
+        if not (0 <= x <= self.canvas.width() and 0 <= y <= self.canvas.height()): return
+        
+        target = self.get_node_at(x, y)
+        if self.mode == "NODE" and target is None:
+            nid = len(self.nodes_pos)
+            self.nodes_pos[nid] = (x, y)
+            self.engine.graph.add_node(nid)
+        elif self.mode == "EDGE" and target is not None:
+            if self.selected_node is None: self.selected_node = target
+            else:
+                self.engine.add_edge(self.selected_node, target)
+                self.selected_node = None
+        self.update_drawing()
 
-    def get_euler_circuit(self):
-        try: return list(nx.eulerian_circuit(self.graph))
-        except: return []
+    def get_node_at(self, x, y):
+        for nid, (nx, ny) in self.nodes_pos.items():
+            if math.sqrt((x-nx)**2 + (y-ny)**2) < 20: return nid
+        return None
 
-    # --- ĐOẠN CODE MỚI: TÌM ĐƯỜNG ĐI NGẮN NHẤT (DIJKSTRA) ---
-    def get_shortest_path(self, start_node, end_node):
-        try:
-            # Tìm danh sách đỉnh trong đường đi ngắn nhất
-            path = nx.shortest_path(self.graph, source=start_node, target=end_node, weight='weight')
-            # Chuyển đổi thành danh sách các cạnh để mô phỏng highlight
-            return [(path[i], path[i+1]) for i in range(len(path)-1)]
-        except:
-            return []
+    def update_drawing(self, high=False):
+        pix = QPixmap(self.canvas.size())
+        pix.fill(Qt.white)
+        painter = QPainter(pix)
+        painter.setRenderHint(QPainter.Antialiasing)
+        
+        for u, v in self.engine.graph.edges():
+            p1, p2 = self.nodes_pos[u], self.nodes_pos[v]
+            if high and ((u, v) in self.highlighted_edges or (v, u) in self.highlighted_edges):
+                painter.setPen(QPen(Qt.red, 4))
+            else:
+                painter.setPen(QPen(Qt.black, 2))
+            painter.drawLine(p1[0], p1[1], p2[0], p2[1])
+
+        for nid, (nx, ny) in self.nodes_pos.items():
+            color = Qt.green if nid == self.selected_node else QColor("#3498db")
+            painter.setBrush(QBrush(color))
+            painter.drawEllipse(nx-18, ny-18, 36, 36)
+            painter.setPen(Qt.white)
+            painter.drawText(nx-6, ny+5, str(nid))
+        painter.end()
+        self.canvas.setPixmap(pix)
+
+    def run_sim(self, algo):
+        self.highlighted_edges = []
+        if len(self.nodes_pos) < 1: return
+        
+        if algo == "bfs": edges = self.engine.get_bfs_edges(0)
+        elif algo == "dfs": edges = self.engine.get_dfs_edges(0)
+        elif algo == "prim": edges = self.engine.get_prim_edges()
+        elif algo == "kruskal": edges = self.engine.get_kruskal_edges()
+        elif algo == "euler": edges = self.engine.get_euler_circuit()
+        elif algo == "shortest": # Logic mới
+            if len(self.nodes_pos) < 2: return
+            edges = self.engine.get_shortest_path(0, len(self.nodes_pos)-1)
+        else: return
+
+        self.step = 0
+        try: self.timer.timeout.disconnect()
+        except: pass
+        self.timer.timeout.connect(lambda: self.next_sim_step(edges))
+        self.timer.start(700)
+
+    def next_sim_step(self, edges):
+        if self.step < len(edges):
+            u, v = edges[self.step][0], edges[self.step][1]
+            self.highlighted_edges.append((u, v))
+            self.update_drawing(True)
+            self.step += 1
+        else: self.timer.stop()
+
+    def run_ff(self):
+        if len(self.nodes_pos) < 2: return
+        val = self.engine.get_max_flow_ff(0, len(self.nodes_pos)-1)
+        QMessageBox.information(self, "7.3 Ford-Fulkerson", f"Luồng cực đại từ 0 đến {len(self.nodes_pos)-1}: {val}")
+
+    def show_conv(self):
+        m, _, _ = self.engine.get_conversions()
+        QMessageBox.information(self, "Mục 6", f"Ma trận kề:\n{m}")
+
+    def check_bi(self):
+        res = self.engine.is_bipartite()
+        QMessageBox.information(self, "Mục 5", f"Đồ thị 2 phía: {'ĐÚNG' if res else 'SAI'}")
+
+    def save_data(self):
+        with open("dothi_phu_final.json", "w") as f:
+            json.dump({"nodes": self.nodes_pos, "edges": list(self.engine.graph.edges())}, f)
+        QMessageBox.information(self, "Mục 2", "Đã lưu đồ thị thành công!")
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = GraphApp()
+    window.show()
+    sys.exit(app.exec_())
