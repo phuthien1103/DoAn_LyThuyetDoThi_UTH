@@ -24,7 +24,6 @@ class GraphEngine:
         except: return []
 
     def is_bipartite(self):
-
         try: return nx.is_bipartite(self.graph)
         except: return False
 
@@ -49,3 +48,13 @@ class GraphEngine:
     def get_euler_circuit(self):
         try: return list(nx.eulerian_circuit(self.graph))
         except: return []
+
+    # --- ĐOẠN CODE MỚI: TÌM ĐƯỜNG ĐI NGẮN NHẤT (DIJKSTRA) ---
+    def get_shortest_path(self, start_node, end_node):
+        try:
+            # Tìm danh sách đỉnh trong đường đi ngắn nhất
+            path = nx.shortest_path(self.graph, source=start_node, target=end_node, weight='weight')
+            # Chuyển đổi thành danh sách các cạnh để mô phỏng highlight
+            return [(path[i], path[i+1]) for i in range(len(path)-1)]
+        except:
+            return []
